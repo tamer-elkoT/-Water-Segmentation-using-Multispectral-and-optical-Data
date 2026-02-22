@@ -1,0 +1,16 @@
+# Data Science & Arrays
+numpy
+scikit-learn
+
+# Geospatial & Imaging
+rasterio
+opencv-python
+pillow
+tifffile
+matplotlib
+
+# Deep Learning
+tensorflow
+
+# Utilities
+tqdm
