@@ -4,8 +4,7 @@ scikit-learn
 
 # Geospatial & Imaging
 rasterio
-opencv-python
-pillow
+opencv-python-headlesspillow #  We replace opencv with headless because we doesn't have GUI for WSL 
 tifffile
 matplotlib
 
