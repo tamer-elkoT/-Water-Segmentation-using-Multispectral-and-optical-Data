@@ -1,11 +1,10 @@
 Data
-Data/
-Models
-Models/
+Dml_pipeline/Data
 Data.rar
 Water Segmentation Task.pdf
 assets
 assets/
 Docs
 Docs/
-
+ml_pipeline/weights
+assets
