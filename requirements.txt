@@ -18,7 +18,7 @@ matplotlib==3.8.4
 # Deep Learning
 # ==========================================
 tensorflow==2.20.0
-
+h5py==3.11.0
 # ==========================================
 # Utilities
 # ==========================================
@@ -31,9 +31,9 @@ fastapi==0.111.0             # High-performance asynchronous API framework
 uvicorn[standard]==0.29.0    # The ASGI server required to run FastAPI
 python-multipart==0.0.9      # Required by FastAPI/Gradio to process file uploads
 gradio==4.36.1               # The Python-based UI framework
-streamlit==1.35.0
-streamlit-folium==0.21.0
-folium==0.16.0
+streamlit
+streamlit-folium
+folium
 # ==========================================
 # Database & ORM (NEW)
 # ==========================================
@@ -46,3 +46,4 @@ geoalchemy2==0.15.1          # Adds PostGIS spatial features to SQLAlchemy (for 
 # ==========================================
 pystac-client==0.8.2         # The client to search satellite databases (STAC catalogs)
 planetary-computer==1.0.0    # Microsoft's library to sign/authenticate the raw .tif downloads
+netron

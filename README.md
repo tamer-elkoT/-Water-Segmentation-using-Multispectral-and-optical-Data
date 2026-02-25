@@ -9,7 +9,7 @@
 
 An end-to-end deep learning pipeline that segments water bodies from 12-channel Sentinel-2 satellite imagery using a custom U-Net architecture. 
 
-**Author:** Tamer | Data Scientist & Analytical Engineer  
+**Author:** Tamer | Full Stack AI Engineer  
 
 ---
 
