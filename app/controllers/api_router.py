@@ -55,7 +55,7 @@ async def predict_water(query: LocationQuery):
     try:
         print(f"Received request for bbox: {query.bbox}")
         # Get the the tif files from the coardinates(bbox)
-        normalized_image = get_tif_files_array_from_MPC(query.bbox)
+        normalized_image, capture_date = get_tif_files_array_from_MPC(query.bbox)
         # Run the U-Net Predictions
         mask = ai_engine.predict(normalized_image) # An Array (128,128) of 0s (land pixel) and 1s (watr pixel)
         # Calculate the percentage of area the existing water in the mask
@@ -84,7 +84,8 @@ async def predict_water(query: LocationQuery):
             "water_percentage": round(water_percentage, 2),
             "total_area_km^2": total_area,
             "water_area_km^2": water_area,
-            "mask_base64": mask_base64
+            "mask_base64": mask_base64,
+            "capture_date": capture_date
 
         }
 
