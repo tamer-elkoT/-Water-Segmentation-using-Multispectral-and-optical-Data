@@ -99,10 +99,8 @@ class WaterSegmentationModel:
 #             raw_image = cv2.resize(raw_image, (128, 128), interpolation=cv2.INTER_LINEAR)
         
 #         # Apply the same Min-Max Normalization used in your training pipeline
-#         min_val = np.min(raw_image)
-#         max_val = np.max(raw_image)
-#         normalized_image = (raw_image - min_val) / (max_val - min_val + 1e-8)
-        
+          #   raw_float = raw_image.astype(np.float32)
+          #   normalized_image = (raw_float - np.min(raw_float)) / (np.max(raw_float) - np.min(raw_float) + 1e-8)        
 #         # 5. Run Inference
 #         print("Running inference on real data...")
 #         prediction_mask = ai_engine.predict(normalized_image)
