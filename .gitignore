@@ -8,3 +8,5 @@ Docs
 Docs/
 ml_pipeline/weights
 assets
+__pycashe__/
+*.__pycashe__
