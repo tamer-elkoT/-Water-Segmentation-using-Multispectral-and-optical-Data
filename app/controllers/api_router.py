@@ -63,13 +63,11 @@ async def predict_water(query: LocationQuery):
         normalized_image, capture_date = get_tif_files_array_from_MPC(query.bbox, start_date=query.start_date, end_date=query.end_date)
         # Run the U-Net Predictions
         mask = ai_engine.predict(normalized_image) # An Array (128,128) of 0s (land pixel) and 1s (watr pixel)
-        # Anything above 50% probability becomes exactly 1 (water). Else 0 (land).
-        # This removes batch or channel dimensions like (1, 128, 128, 1)
-        flat_mask = np.squeeze(mask)
-        binary_mask = (mask > 0.5).astype(np.uint8)
+     
+        binary_mask = mask.astype(np.uint8)
         # Calculate the percentage of area the existing water in the mask
         # if the pixels are water 
-        water_pixels = np.sum(binary_mask==1)
+        water_pixels = np.count_nonzero(binary_mask==1)
         # get the total pixels water(1) + land(0)
         total_pixels = binary_mask.size
         # get the percentage of the water in the segmented image
