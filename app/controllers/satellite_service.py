@@ -8,7 +8,7 @@ import numpy as np
 import cv2
 from rasterio.warp import transform_bounds
 
-def get_tif_files_array_from_MPC(bbox: list, target_shape=(128, 128)):
+def get_tif_files_array_from_MPC(bbox: list,start_date: str, end_date: str,  target_shape=(128, 128)):
     """
     Queries Microsoft Planetary Computer for Sentinel-2 data over a specific GPS box,
     downloads the 12 required bands, and stacks them into a single array.
@@ -32,7 +32,7 @@ def get_tif_files_array_from_MPC(bbox: list, target_shape=(128, 128)):
     search = catalog.search(
         collections=["sentinel-2-l2a"],
         bbox=bbox,
-        datetime="2025-01-01/2025-12-31", # Search the last year
+        datetime=f"{start_date}/{end_date}", # Search the last year
         query={"eo:cloud_cover": {"lt": 5}}, # Less than 5% clouds
         max_items=1
     )
@@ -84,6 +84,7 @@ def get_tif_files_array_from_MPC(bbox: list, target_shape=(128, 128)):
     
     # 5. Apply the exact same Min-Max Normalization used during your model training
     normalized_image = (stacked_image - np.min(stacked_image)) / (np.max(stacked_image) - np.min(stacked_image) + 1e-8)
+    # normalized_image = stacked_image / 10000.0
     # 🚨 THE FIX: Extract the date from best_item and return BOTH!
     capture_date = best_item.datetime.strftime("%Y-%m-%d")
         

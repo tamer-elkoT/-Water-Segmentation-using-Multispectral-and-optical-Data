@@ -9,7 +9,11 @@ import cv2
 from app.controllers.satellite_service import get_tif_files_array_from_MPC
 from app.models.unet_inference import WaterSegmentationModel
 from app.core.config import settings
-
+# Create a basemodel that make date option is dynamic so we can select the date we want to search for
+class WaterPredictionQuery(BaseModel):
+    bbox: list[float]
+    start_date: str 
+    end_date: str
 print("Initalizating AI Engine inside API Router...")
 ai_engine = WaterSegmentationModel(model_path=settings.MODEL_PATH)
 
@@ -18,7 +22,8 @@ router = APIRouter()
 # Define the Expected input data structure using pydantic
 class LocationQuery(BaseModel):
     bbox: list[float]
-
+    start_date: str
+    end_date: str
 # Create a function that calculate the area of the water in the segmented image
 import math
 
@@ -55,14 +60,18 @@ async def predict_water(query: LocationQuery):
     try:
         print(f"Received request for bbox: {query.bbox}")
         # Get the the tif files from the coardinates(bbox)
-        normalized_image, capture_date = get_tif_files_array_from_MPC(query.bbox)
+        normalized_image, capture_date = get_tif_files_array_from_MPC(query.bbox, start_date=query.start_date, end_date=query.end_date)
         # Run the U-Net Predictions
         mask = ai_engine.predict(normalized_image) # An Array (128,128) of 0s (land pixel) and 1s (watr pixel)
+        # Anything above 50% probability becomes exactly 1 (water). Else 0 (land).
+        # This removes batch or channel dimensions like (1, 128, 128, 1)
+        flat_mask = np.squeeze(mask)
+        binary_mask = (mask > 0.5).astype(np.uint8)
         # Calculate the percentage of area the existing water in the mask
         # if the pixels are water 
-        water_pixels = np.sum(mask==1)
+        water_pixels = np.sum(binary_mask==1)
         # get the total pixels water(1) + land(0)
-        total_pixels = mask.size
+        total_pixels = binary_mask.size
         # get the percentage of the water in the segmented image
         water_percentage = (water_pixels/total_pixels)*100
         # prepare the mask by multiply the mask by 255 to make it contain range from (0,255) instead of (0,1)
