@@ -35,7 +35,7 @@ _, center_col, _ = st.columns([1, 2, 1])
 with center_col:
     if st.button("🚀 Try It Out (Launch AI Engine)", type="primary", use_container_width=True):
         # This tells Streamlit to instantly load the tool file!
-        st.switch_page("pages/1_Water_Tool.py")
+        st.switch_page("pages/1_Water_tool.py")
 
 st.divider()
 
