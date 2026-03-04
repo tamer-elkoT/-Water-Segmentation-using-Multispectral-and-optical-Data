@@ -102,6 +102,10 @@ conda activate water_seg
 ```bash
 pip install -r requirements.txt
 ```
+# Connecting to the postgresql
+```bash
+sudo service postgresql start
+```
 
 ![End-to-End User Scenario](/mnt/d/01_Projects/CV/Water_Segmentation/assets/User_Senario.svg)
 

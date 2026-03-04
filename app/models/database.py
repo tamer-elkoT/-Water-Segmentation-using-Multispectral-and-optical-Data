@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from typing import List
 
 # Create the Engine 
-engine = create_engine("postgresql://postgres:T365t14#@localhost:5432/water_segmentation")
+engine = create_engine("postgresql://postgres:T365t14#@127.0.0.1:5432/water_segmentation")
 # Create the SessionLocal class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

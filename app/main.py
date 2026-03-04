@@ -1,5 +1,10 @@
 from fastapi import FastAPI
 from app.controllers.api_router import router
+from app.models.database import engine, Base
+from app.core.db_setup import WaterPredictions
+
+# Create the Tables in the database if they don't exist 
+Base.metadata.create_all(bind=engine)
 
 # intialize the fastapi app
 app = FastAPI(
