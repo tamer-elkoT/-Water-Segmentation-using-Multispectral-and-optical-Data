@@ -1,29 +1,30 @@
 # Create the End-point predict/
 # Do the calculation of Area, Location, date
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 import numpy as np
 import base64
 import cv2
-
+from datetime import date
 from app.controllers.satellite_service import get_tif_files_array_from_MPC
 from app.models.unet_inference import WaterSegmentationModel
 from app.core.config import settings
+from sqlalchemy.orm import Session
+from app.models.database import get_db
+from app.core.db_setup import WaterPredictions
+from datetime import date
+from app.models.schemas import PredicitonRequest
 # Create a basemodel that make date option is dynamic so we can select the date we want to search for
 class WaterPredictionQuery(BaseModel):
     bbox: list[float]
-    start_date: str 
-    end_date: str
+    start_date: date 
+    end_date: date
 print("Initalizating AI Engine inside API Router...")
 ai_engine = WaterSegmentationModel(model_path=settings.MODEL_PATH)
 
 router = APIRouter()
 
-# Define the Expected input data structure using pydantic
-class LocationQuery(BaseModel):
-    bbox: list[float]
-    start_date: str
-    end_date: str
+
 # Create a function that calculate the area of the water in the segmented image
 import math
 
@@ -52,7 +53,7 @@ def get_areas(bbox: list[float], water_percentage: float):
     return round(total_area_sqkm, 2), round(water_area_sqkm, 2)
 
 @router.post("/predict")
-async def predict_water(query: LocationQuery):
+async def run_prediction_and_save(query: PredicitonRequest, db: Session = Depends(get_db)):
     """
     Receives a GPS bounding box, fetches live satellite data, runs the U-Net,
     and returns the water mask as a Base64 encoded image.
@@ -86,17 +87,34 @@ async def predict_water(query: LocationQuery):
         # Get the Water Area in KM^2
         total_area, water_area = get_areas(query.bbox, water_percentage)
         # Return the Jsong payload of the status of the image 
+    
+        # Save the predictions to the database
+        db_prediction = WaterPredictions(
+            bbox=query.bbox,
+            capture_date=capture_date,
+            water_percentage= round(water_percentage,2),
+            total_area= total_area,
+            water_area= water_area
+        )
+
+        db.add(db_prediction)
+        db.commit()
+        db.refresh(db_prediction)
         return {
-            "is open cv creates the png file": success,
-            "water_percentage": round(water_percentage, 2),
-            "total_area_km^2": total_area,
-            "water_area_km^2": water_area,
-            "mask_base64": mask_base64,
-            "capture_date": capture_date
-
+            "message": "Inference completed and saved to database",
+            "data": db_prediction,
+            "mask_image": mask_base64
         }
-
     except Exception as e:
         # If anything fails (like clouds blocking the satellite), return a clean error
         print(f"API Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# @router.post("/predictions/")
+# def save_predictions(id:int, bbox: str, capture_date: date, water_percentage: float, total_area: float, water_area: float, db: Session = Depends(get_db)):
+#     """Endpoint to save predictions to the database."""
+#     new_prediction = WaterPredictions(id=id, bbox=bbox, capture_date=capture_date, water_percentage=water_percentage, total_area=total_area)
+#     db.add(new_prediction)
+#     db.commit()
+#     db.refresh(new_prediction)
+#     return new_prediction

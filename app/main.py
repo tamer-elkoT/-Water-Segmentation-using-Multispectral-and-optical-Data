@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from app.controllers.api_router import router
-# from app.core.database import engine             
-# from app.models import db_models
+
 # intialize the fastapi app
 app = FastAPI(
     title="🌍 Sentinel-2 Water Segmentation API",
