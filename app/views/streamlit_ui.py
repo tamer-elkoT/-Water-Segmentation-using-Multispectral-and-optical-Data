@@ -385,18 +385,22 @@ if map_output and map_output.get("last_active_drawing"):
                         response = requests.post(api_url, json=payload)
                         
                         if response.status_code == 200:
-                            data = response.json()
+                            result = response.json()
                             
                             st.markdown("---")
+                            
+                            # st.write("### 🔍 RAW API RESPONSE (For Debugging)")
+                            # st.json(result)
+
                             st.subheader("📊 Analytics Report")
                             
                             col1, col2, col3, col4 = st.columns(4)
-                            col1.metric("Capture Date", data["capture_date"])
-                            col2.metric("Total Scan Area", f"{data['total_area_km^2']} km²")
-                            col3.metric("Water Area", f"{data['water_area_km^2']} km²")
-                            col4.metric("Water Coverage", f"{data['water_percentage']}%")
+                            col1.metric("Capture Date", result['data']['capture_date'])
+                            col2.metric("Total Scan Area", f"{result['data']['total_area']} km²")
+                            col3.metric("Water Area", f"{result['data']['water_area']} km²")
+                            col4.metric("Water Coverage", f"{result['data']['water_percentage']}%")
                             
-                            img_bytes = base64.b64decode(data["mask_base64"])
+                            img_bytes = base64.b64decode(result["mask_image"])
                             mask_array = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), cv2.IMREAD_UNCHANGED)
                             
                             blue_mask = np.zeros((128, 128, 3), dtype=np.uint8)
