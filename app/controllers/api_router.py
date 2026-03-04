@@ -14,6 +14,9 @@ from app.models.database import get_db
 from app.core.db_setup import WaterPredictions
 from datetime import date
 from app.models.schemas import PredicitonRequest
+import math
+import calendar
+from datetime import date, timedelta
 # Create a basemodel that make date option is dynamic so we can select the date we want to search for
 class WaterPredictionQuery(BaseModel):
     bbox: list[float]
@@ -26,8 +29,6 @@ router = APIRouter()
 
 
 # Create a function that calculate the area of the water in the segmented image
-import math
-
 def get_areas(bbox: list[float], water_percentage: float):
     """
     Converts a GPS bounding box into Square Kilometers, 
@@ -52,6 +53,46 @@ def get_areas(bbox: list[float], water_percentage: float):
 
     return round(total_area_sqkm, 2), round(water_area_sqkm, 2)
 
+
+def generate_dynamic_intervals(start_date: date, end_date: date):
+    """
+    Dynamically chops a date range into intervals.
+    - If > 31 days: Chops into 1-month intervals.
+    - If <= 31 days: Chops into 5-day intervals (matching Sentinel-2's orbit).
+    Example: 2023-01-01 to 2023-03-15 becomes:
+    [(2023-01-01, 2023-01-31), (2023-02-01, 2023-02-28), (2023-03-01, 2023-03-15)]
+    Args:
+    start_date: The absolute earliest date you want to search for where the user can select the date they want to search for
+    end_date: The absolute latest date you want to search for where the user can select the
+    """
+    intervals=[] # List of tuples that contain the start and end date of each month in the range
+    current_start = start_date
+    total_days = (end_date - start_date).days
+
+    if total_days <= 31:
+        while current_start < end_date:
+            # Find the next 5-day interval
+            current_end = current_start + timedelta(days=4)
+            if current_end > end_date:
+                current_end = end_date
+            
+            intervals.append((current_start, current_end))
+            # Move to the next interval
+            current_start = current_end + timedelta(days=1)
+    else:
+        while current_start < end_date:
+            # Find the last day of the current month
+            _, last_day = calendar.monthrange(current_start.year, current_start.month) # Calculate the lenght of the month to get the last day of the month
+            current_end = date(current_start.year, current_start.month, last_day) # Create a date object for the last day of the month
+            if current_end > end_date:
+                current_end = end_date
+            
+            intervals.append((current_start, current_end))
+
+            # Move forward to the first day of the next month
+            current_start = current_end + timedelta(days=1) # timedelta is used to add one day to the current end date to get the start date of the next month
+
+    return intervals    
 @router.post("/predict")
 async def run_prediction_and_save(query: PredicitonRequest, db: Session = Depends(get_db)):
     """
@@ -118,3 +159,71 @@ async def run_prediction_and_save(query: PredicitonRequest, db: Session = Depend
 #     db.commit()
 #     db.refresh(new_prediction)
 #     return new_prediction
+
+# Create an endpoint to make predictions of the water timeline
+@router.post("/predict_timeline")
+async def run_timeline_predictions(query: PredicitonRequest, db: Session = Depends(get_db)):
+    """
+    Takes a date range, chops it into monthly chunks, runs the AI on each chunk,
+    saves the results to the database, and returns a historical timeline.
+    """
+    try: 
+        print(f"Received timeline request for bbox: {query.bbox} from {query.start_date} to {query.end_date}")
+
+        # Get the intervals from the start date to the end date in monthly intervals
+        date_intervals = generate_dynamic_intervals(query.start_date, query.end_date)
+        timeline_results = []
+
+        for start, end in date_intervals:
+            try:
+                print(f"Processing interval: {start} to {end}")
+                # Get the the tif files from the coardinates(bbox) for each month
+                normalized_image, capture_date = get_tif_files_array_from_MPC(query.bbox, start_date=start, end_date=end)
+                # Run the U-Net Predictions
+                mask = ai_engine.predict(normalized_image) # An Array (128,128) of 0s (land pixel) and 1s (watr pixel)
+            
+                binary_mask = mask.astype(np.uint8)
+                # Calculate the percentage of area the existing water in the mask
+                # if the pixels are water 
+                water_pixels = np.count_nonzero(binary_mask==1)
+                # get the total pixels water(1) + land(0)
+                total_pixels = binary_mask.size
+                # get the percentage of the water in the segmented image
+                water_percentage = (water_pixels/total_pixels)*100
+                # Get the Water Area in KM^2
+                total_area, water_area = get_areas(query.bbox, water_percentage)
+
+                # Save the predictions to the database
+                db_prediction = WaterPredictions(
+                    bbox=query.bbox,
+                    capture_date=capture_date,
+                    water_percentage= round(water_percentage,2),
+                    total_area= total_area,
+                    water_area= water_area
+                )
+
+                db.add(db_prediction)
+                db.commit()
+                db.refresh(db_prediction)
+
+                # Append to timeline results
+                timeline_results.append({
+                    "capture_date": capture_date,
+                    "water_percentage": round(water_percentage,2),
+                    "total_area": total_area,
+                    "water_area": water_area
+                })
+            except Exception as e:
+                # If the API call fails (like clouds blocking the satellite),skip that month and continue with the next month
+                print(f"Skipping {start} to {end}: {str(e)}")
+                continue
+        
+        if not timeline_results:
+            raise ValueError("No clear satellite images found for any month in this range.")
+        
+        return {
+            "message": "Timeline generated successfully",
+            "timeline_data": timeline_results
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
