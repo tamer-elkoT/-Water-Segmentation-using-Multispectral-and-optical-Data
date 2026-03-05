@@ -192,6 +192,11 @@ async def run_timeline_predictions(query: PredicitonRequest, db: Session = Depen
                 water_percentage = (water_pixels/total_pixels)*100
                 # Get the Water Area in KM^2
                 total_area, water_area = get_areas(query.bbox, water_percentage)
+                mask_visual = (mask * 255).astype(np.uint8)
+                success, buffer = cv2.imencode(".png", mask_visual)
+                if not success:
+                    raise ValueError("Failed to encode image mask.")
+                mask_base64 = base64.b64encode(buffer).decode("utf-8")
 
                 # Save the predictions to the database
                 db_prediction = WaterPredictions(
@@ -211,7 +216,8 @@ async def run_timeline_predictions(query: PredicitonRequest, db: Session = Depen
                     "capture_date": capture_date,
                     "water_percentage": round(water_percentage,2),
                     "total_area": total_area,
-                    "water_area": water_area
+                    "water_area": water_area,
+                    "mask_image": mask_base64
                 })
             except Exception as e:
                 # If the API call fails (like clouds blocking the satellite),skip that month and continue with the next month

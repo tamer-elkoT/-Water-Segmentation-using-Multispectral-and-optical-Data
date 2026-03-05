@@ -9,6 +9,7 @@ import cv2
 import math
 import datetime
 import pandas as pd
+import plotly.express as px
 # 1. Page Configuration (Must be the very first Streamlit command)
 st.set_page_config(
     page_title="AI Water Segmentation",
@@ -158,76 +159,80 @@ if map_output and map_output.get("last_active_drawing"):
             start_date = start_date_obj.strftime("%Y-%m-%d")
             end_date = end_date_obj.strftime("%Y-%m-%d")
 
+            # ==========================================
+            # 1. THE BUTTON (Only fetches and saves data)
+            # ==========================================
             if st.button("🚀 Run U-Net Analysis", type="primary"):
                 with st.spinner(f"Scanning satellite data from {start_date} to {end_date}..."):
                     try:
-                        api_url = "http://127.0.0.1:8000/api/predict"
-                        
-                        payload = {
-                            "bbox": bbox,
-                            "start_date": start_date,
-                            "end_date": end_date
-                        }
+                        api_url = "http://127.0.0.1:8000/api/predict_timeline"
+                        payload = {"bbox": bbox, "start_date": start_date, "end_date": end_date}
                         response = requests.post(api_url, json=payload)
                         
                         if response.status_code == 200:
                             result = response.json()
-                            
-                            st.markdown("---")
-                            
-                            # st.write("### 🔍 RAW API RESPONSE (For Debugging)")
-                            # st.json(result)
-
-                            st.subheader("📊 Analytics Report")
-                            
-                            col1, col2, col3, col4 = st.columns(4)
-                            col1.metric("Capture Date", result['data']['capture_date'])
-                            col2.metric("Total Scan Area", f"{result['data']['total_area']} km²")
-                            col3.metric("Water Area", f"{result['data']['water_area']} km²")
-                            col4.metric("Water Coverage", f"{result['data']['water_percentage']}%")
-                            
-                            img_bytes = base64.b64decode(result["mask_image"])
-                            mask_array = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), cv2.IMREAD_UNCHANGED)
-                            
-                            # ... (Your existing code above this stays the same) ...
-                            blue_mask = np.zeros((128, 128, 3), dtype=np.uint8)
-                            blue_mask[mask_array == 255] = [0, 150, 255] 
-                            
-                            st.image(blue_mask, caption="AI Predicted Water Mask", width=400)
-                            
-                            # 🚨 PASTE THE NEW HISTORY SECTION HERE 🚨
-                            st.markdown("---")
-                            st.subheader("🗄️ Global Analysis History")
-                            
-                            with st.expander("📜 View Past Analyses (Fetched from PostgreSQL)"):
-                                st.markdown("Fetching the latest satellite records from the database...")
-                                try:
-                                    # This calls the new endpoint we will build in FastAPI
-                                    history_response = requests.get("http://127.0.0.1:8000/api/history")
-                                    
-                                    if history_response.status_code == 200:
-                                        history_data = history_response.json()
-                                        
-                                        if len(history_data) > 0:
-                                            # Convert the JSON into a beautiful Pandas table
-                                            df = pd.DataFrame(history_data)
-                                            
-                                            # Reorder and rename columns for a professional UI (matching your exact keys)
-                                            df = df[['capture_date', 'total_area_km^2', 'water_area_km^2', 'water_percentage']]
-                                            df.columns = ['Capture Date', 'Total Area (km²)', 'Water Area (km²)', 'Water (%)']
-                                            
-                                            st.dataframe(df, use_container_width=True, hide_index=True)
-                                        else:
-                                            st.info("The database is currently empty. Run more analyses to build history!")
-                                    else:
-                                        st.warning("Could not fetch history. Is the database connected?")
-                                        
-                                except Exception as e:
-                                    st.error(f"Database connection error: {e}")
-                            # 🚨 END OF NEW SECTION 🚨
-
+                            # 🚨 THE FIX: Save the data permanently into Streamlit's memory!
+                            st.session_state.timeline_data = result["timeline_data"]
                         else:
                             st.error(f"Backend Error: {response.text}")
-                        
                     except Exception as e:
-                        st.error(f"Could not connect to FastAPI. Is your server running? Error: {e}")
+                        st.error(f"Could not connect to FastAPI. Error: {e}")
+
+            # ==========================================
+            # THE UI (Renders the interactive chart)
+            # ==========================================
+            if "timeline_data" in st.session_state:
+                timeline_data = st.session_state.timeline_data
+                
+                st.markdown("---")
+                st.subheader("📈 Historical Water Analysis")
+                
+                # 1. THE RADIO BUTTONS (Must be exactly here!)
+                chart_type = st.radio(
+                    "📊 Select Chart Style:", 
+                    options=["Area Chart", "Line Chart", "Bar Chart"], 
+                    horizontal=True
+                )
+                
+                import plotly.express as px
+                import pandas as pd
+                
+                df = pd.DataFrame(timeline_data)
+                
+                # 2. THE PLOTLY LOGIC
+                if chart_type == "Area Chart":
+                    fig = px.area(df, x="capture_date", y="water_percentage", markers=True, color_discrete_sequence=["#0099ff"])
+                elif chart_type == "Line Chart":
+                    fig = px.line(df, x="capture_date", y="water_percentage", markers=True, color_discrete_sequence=["#0099ff"])
+                    fig.update_traces(line=dict(width=3), marker=dict(size=8)) 
+                else:
+                    fig = px.bar(df, x="capture_date", y="water_percentage", color_discrete_sequence=["#0099ff"])
+                
+                fig.update_xaxes(type='category', title="Capture Date", tickangle=-45)
+                fig.update_yaxes(title="Water Coverage (%)")
+                
+                # 3. DRAW THE CHART
+                st.plotly_chart(fig, use_container_width=True)
+                # Now find the data for whatever date was selected (or the only date available)
+                selected_data = next(item for item in timeline_data if item["capture_date"] == selected_date)
+                
+                # ... (Keep your existing col1, col2 metrics and st.image code below this) ...
+                
+                # Display Metrics
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("Capture Date", selected_data['capture_date'])
+                col2.metric("Total Scan Area", f"{selected_data['total_area']} km²")
+                col3.metric("Water Area", f"{selected_data['water_area']} km²")
+                col4.metric("Water Coverage", f"{selected_data['water_percentage']}%")
+                
+                # Display the Base64 Image
+                if "mask_image" in selected_data:
+                    img_bytes = base64.b64decode(selected_data["mask_image"])
+                    mask_array = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), cv2.IMREAD_UNCHANGED)
+                    
+                    blue_mask = np.zeros((128, 128, 3), dtype=np.uint8)
+                    blue_mask[mask_array == 255] = [0, 150, 255] 
+                    
+                    st.image(blue_mask, caption=f"AI Predicted Water Mask ({selected_date})", width=400)
+                else:
+                    st.error("mask_image is missing from the API response! Check your FastAPI backend.")
